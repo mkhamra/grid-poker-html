@@ -1,0 +1,2128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Grid Poker Roguelite v2.6.2 — Ship Hotfix (Single-File)</title>
+<style>
+  :root{
+    --bg:#0b0d12; --p1:#12182a; --p2:#0f1423;
+    --ink:#e9ecf1; --muted:#9aa3b2; --line:rgba(255,255,255,.12);
+    --good:#41d17a; --bad:#ff5a6a; --warn:#ffcc66;
+    --cardA:#212b45; --cardB:#161d32;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    background:radial-gradient(1200px 650px at 50% 0%, #1a2240 0%, var(--bg) 62%);
+    color:var(--ink);
+    overflow-x:hidden;
+  }
+  .wrap{max-width:1220px;margin:0 auto;padding:16px}
+  header{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap}
+  h1{margin:0;font-size:18px;letter-spacing:.2px}
+  .sub{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.35;max-width:980px}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button, .toggle{
+    appearance:none;border:1px solid var(--line);
+    background:linear-gradient(180deg,#1b2340 0%,#12182a 100%);
+    color:var(--ink);padding:10px 12px;border-radius:10px;
+    cursor:pointer;font-weight:900;font-size:13px
+  }
+  button:hover,.toggle:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .toggle{display:flex;gap:8px;align-items:center}
+  .toggle input{accent-color:#fff}
+
+  .grid{display:grid;grid-template-columns: 1.25fr 1fr;gap:12px}
+  .panel{
+    border:1px solid var(--line); border-radius:16px; overflow:hidden;
+    background:linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(0,0,0,.10) 100%);
+  }
+  .barTop{
+    padding:12px 14px; border-bottom:1px solid var(--line);
+    background:rgba(0,0,0,.25);
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap
+  }
+  .badge{
+    display:inline-flex;align-items:center;gap:8px;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(0,0,0,.18);
+    padding:6px 10px;border-radius:999px;
+    font-weight:950;font-size:12px;letter-spacing:.2px
+  }
+  .statLine{display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:12px}
+
+  .hpWrap{min-width:220px; position:relative}
+  .hpText{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:6px}
+  .bar{height:10px;border-radius:999px;background:rgba(255,255,255,.10);overflow:hidden;border:1px solid rgba(255,255,255,.10)}
+  .fill{height:100%;width:100%;background:linear-gradient(90deg,#36e07c 0%, #ffc857 60%, #ff4d5f 100%);transition:width .25s ease}
+
+  .content{padding:14px}
+
+  /* Board */
+  .boardWrap{display:grid;gap:10px}
+  .board{display:grid;grid-template-columns: repeat(5, 1fr);gap:8px;user-select:none;perspective:800px}
+
+  /* Slight tint difference so border reads instantly */
+  .cell{
+    aspect-ratio: 1/1;border-radius:14px;border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg,#18203a 0%, #0f1426 100%);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer; position:relative; overflow:hidden;
+    transition: transform .08s ease, filter .08s ease;
+  }
+  .cell.border{background:linear-gradient(180deg,#1a2440 0%, #0f162b 100%);}
+  .cell.center{background:linear-gradient(180deg,#151c33 0%, #0c1020 100%);}
+  .cell:hover{filter:brightness(1.07);transform:translateY(-1px)}
+  .cell.empty{
+    border-style:dashed;border-color:rgba(255,255,255,.18);
+    background:linear-gradient(180deg, rgba(255,255,255,.05) 0%, rgba(0,0,0,.10) 100%);
+  }
+  .cell.center::before{
+    content:"CENTER";position:absolute;top:6px;left:8px;
+    font-size:9px;letter-spacing:.6px;color:rgba(255,255,255,.20);font-weight:950;
+  }
+  .cell.border::before{
+    content:"BORDER";position:absolute;top:6px;left:8px;
+    font-size:9px;letter-spacing:.6px;color:rgba(255,255,255,.18);font-weight:950;
+  }
+  .cell.disabled{cursor:not-allowed;opacity:.60;transform:none}
+  .cell.sel::after{
+    content:"";position:absolute;inset:-2px;border-radius:16px;
+    border:2px solid rgba(255,255,255,.62);pointer-events:none;
+  }
+  .cell.hl::after{
+    content:"";position:absolute;inset:-2px;border-radius:16px;
+    border:2px solid rgba(65,209,122,.70);pointer-events:none;
+  }
+  .cell.possible::after{
+    content:"";position:absolute;inset:-2px;border-radius:16px;
+    border:2px solid rgba(255,204,102,.55);pointer-events:none;
+  }
+  .cell.top1::after{
+    content:"";position:absolute;inset:-2px;border-radius:16px;
+    border:2px solid rgba(65,209,122,.70);pointer-events:none;
+  }
+  .cell.top2::after{
+    content:"";position:absolute;inset:-2px;border-radius:16px;
+    border:2px solid rgba(110,205,255,.55);pointer-events:none;
+  }
+  .cell.top3::after{
+    content:"";position:absolute;inset:-2px;border-radius:16px;
+    border:2px solid rgba(255,204,102,.55);pointer-events:none;
+  }
+  .cell .txt{font-weight:1000;letter-spacing:.3px;font-size:16px}
+  .cell .suit{position:absolute;bottom:6px;right:8px;font-size:12px;opacity:.85}
+  .joker{color:var(--warn)}
+
+  .rankBadge{
+    position:absolute;bottom:6px;left:8px;
+    font-weight:1000;font-size:11px;
+    padding:3px 7px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.18);
+    background:rgba(0,0,0,.28);
+    color:rgba(255,255,255,.85);
+  }
+
+  /* Preview panel */
+  .preview{
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:16px;
+    background:rgba(0,0,0,.22);
+    padding:12px;
+    display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;
+  }
+  .preview b{font-size:13px}
+  .preview .hint{color:var(--muted);font-size:12px;line-height:1.35;max-width:720px}
+  .preview .big{
+    font-weight:1000;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(0,0,0,.18);
+    padding:10px 12px;
+    border-radius:14px;
+    min-width:260px;
+    text-align:center;
+  }
+  .preview .big.good{outline:2px solid rgba(65,209,122,.35)}
+  .preview .big.warn{outline:2px solid rgba(255,204,102,.25)}
+  .preview .mini{
+    display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+    color:rgba(255,255,255,.78);font-size:12px;font-weight:900
+  }
+  .chip{
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(0,0,0,.18);
+    padding:6px 10px;border-radius:999px;
+  }
+
+
+  .chip.active{
+    border-color:rgba(110,205,255,.45);
+    background:rgba(0,0,0,.26);
+    color:rgba(255,255,255,.92);
+    box-shadow:0 0 0 2px rgba(110,205,255,.10) inset;
+  }
+  .lineBadge{
+    justify-self:end;
+    font-size:12px;font-weight:1000;
+    padding:6px 10px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(0,0,0,.18);
+    color:rgba(255,255,255,.88);
+    opacity:0; transform:translateY(-4px);
+    transition: opacity .18s ease, transform .18s ease;
+    pointer-events:none;
+  }
+  .lineBadge.on{opacity:1; transform:translateY(0)}
+
+  /* Hands */
+  .handsRow{display:grid;grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px}
+  .handBox{
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;padding:12px;background:rgba(0,0,0,.22);
+  }
+  .handTitle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .handTitle b{font-size:13px}
+  .tiny{font-size:11px;color:rgba(255,255,255,.55)}
+  .handCards{display:grid;grid-template-columns: repeat(4, minmax(0,1fr)); gap:8px}
+  .cardBtn{
+    border-radius:14px;padding:10px 10px;border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg,var(--cardA) 0%, var(--cardB) 100%);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    font-weight:1000; min-height:44px; position:relative;
+  }
+  .cardBtn:hover{filter:brightness(1.08)}
+  .cardBtn.sel{outline:2px solid rgba(255,255,255,.62)}
+  .cardBtn:disabled{opacity:.45;cursor:not-allowed}
+  .facedown{
+    color:rgba(255,255,255,.75);
+    background:linear-gradient(180deg, rgba(255,255,255,.08) 0%, rgba(0,0,0,.20) 100%);
+    border-style:dashed;
+    cursor:default;
+  }
+
+  .pillRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .pill{
+    font-size:12px;font-weight:950;padding:6px 10px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18);color:var(--ink);
+  }
+  .divider{height:1px;background:rgba(255,255,255,.10);margin:10px 0}
+
+  .log{
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:14px;padding:12px;background:rgba(0,0,0,.22);
+    color:var(--muted);font-size:12px;line-height:1.45;min-height:220px;white-space:pre-line;
+  }
+
+  /* Right panel */
+  .sectionTitle{font-weight:1000;font-size:13px;margin:0 0 8px;color:rgba(255,255,255,.78)}
+  .list{display:grid;grid-template-columns:1fr;gap:10px}
+  .itemRow{
+    border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);
+    display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;
+  }
+  .itemRow b{font-size:13px}
+  .itemRow small{display:block;color:var(--muted);margin-top:6px;line-height:1.35}
+  .tag{font-size:12px;font-weight:1000;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18)}
+
+  /* Overlays */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.66);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+  .overlay.on{display:flex}
+  .modal{
+    width:min(900px, 100%);
+    border-radius:18px;border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(0,0,0,.35) 100%);
+    overflow:hidden;box-shadow: 0 20px 80px rgba(0,0,0,.55);
+  }
+  .modalTop{
+    padding:12px 14px;background:rgba(0,0,0,.35);border-bottom:1px solid rgba(255,255,255,.12);
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  }
+  .modalTop b{font-weight:1000}
+  .modalBody{padding:14px}
+  .twoCol{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
+  .callout{
+    border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.20);
+    color:var(--muted);font-size:12px;line-height:1.45;
+  }
+  .steps{display:grid;gap:10px;margin-top:10px}
+  .step{border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18)}
+  .step b{color:var(--ink)}
+
+  /* Toast + Damage pop */
+  .toast{
+    position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
+    padding:10px 12px; border-radius:12px;background:rgba(0,0,0,.70);
+    border:1px solid rgba(255,255,255,.14);color:var(--ink);font-weight:1000;font-size:12px;
+    opacity:0; pointer-events:none;transition: opacity .18s ease, transform .18s ease;z-index:80;
+  }
+  .toast.on{opacity:1; transform:translateX(-50%) translateY(-2px)}
+
+  .dmgPop{
+    position:absolute;
+    top:-18px;
+    right:0;
+    font-weight:1000;
+    font-size:14px;
+    color:rgba(255,255,255,.92);
+    text-shadow:0 2px 12px rgba(0,0,0,.65);
+    opacity:0;
+    transform:translateY(0);
+    pointer-events:none;
+  }
+  @keyframes pop {
+    0%{opacity:0; transform:translateY(6px) scale(.98)}
+    15%{opacity:1; transform:translateY(0) scale(1)}
+    100%{opacity:0; transform:translateY(-10px) scale(1.02)}
+  }
+
+  /* Commit pulse when ready */
+  @keyframes pulse {
+    0%{filter:brightness(1.05)}
+    50%{filter:brightness(1.20)}
+    100%{filter:brightness(1.05)}
+  }
+  .readyPulse{outline:2px solid rgba(65,209,122,.35); animation:pulse 1.1s ease-in-out infinite}
+
+  /* Tiny screen shake (soft) */
+  @keyframes shake {
+    0%{transform:translateX(0)}
+    25%{transform:translateX(-2px)}
+    50%{transform:translateX(2px)}
+    75%{transform:translateX(-1px)}
+    100%{transform:translateX(0)}
+  }
+  .shake{animation:shake .18s ease-in-out 1}
+
+  .kbd{
+    font-weight:950;
+    font-size:11px;
+    padding:2px 6px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,.16);
+    background:rgba(0,0,0,.18);
+    color:rgba(255,255,255,.80);
+  }
+  /* v2.1 polish */
+  .mutedBtn{opacity:.75}
+  .clashStrip{
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:16px;
+    background:linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.18) 100%);
+    padding:10px 12px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    margin-top:10px;
+    min-height:48px;
+    opacity:.0;
+    transform:translateY(-4px);
+    transition: opacity .18s ease, transform .18s ease;
+  }
+  .clashStrip.on{opacity:1; transform:translateY(0)}
+  .clashStrip .side{display:flex;gap:10px;align-items:center}
+  .clashStrip .hand{font-weight:1000}
+  .clashStrip .dmg{font-weight:1000}
+  .clashStrip .tag2{
+    font-size:11px;font-weight:950;padding:4px 8px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18);color:rgba(255,255,255,.85)
+  }
+  .clashStrip.good{outline:2px solid rgba(65,209,122,.22)}
+  .clashStrip.bad{outline:2px solid rgba(255,90,106,.20)}
+  .clashStrip.warn{outline:2px solid rgba(255,204,102,.16)}
+
+  .hoverTip{
+    position:fixed; left:0; top:0;
+    transform:translate(-9999px,-9999px);
+    padding:10px 12px; border-radius:12px;
+    background:rgba(0,0,0,.78);
+    border:1px solid rgba(255,255,255,.14);
+    color:rgba(255,255,255,.92);
+    font-size:12px; line-height:1.35;
+    box-shadow:0 18px 70px rgba(0,0,0,.55);
+    pointer-events:none;
+    z-index:90;
+    max-width:min(360px, 70vw);
+  }
+  .hoverTip b{font-weight:1000}
+  .cell.lineHover::after{
+    content:"";position:absolute;inset:-3px;border-radius:18px;
+    border:2px solid rgba(110,205,255,.55);pointer-events:none;
+    box-shadow:0 0 0 2px rgba(0,0,0,.35) inset;
+  }
+
+  .summaryGrid{display:grid;grid-template-columns: 1fr 1fr; gap:12px}
+  .summaryKPI{
+    border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.20);
+    display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  }
+  .summaryKPI b{font-size:13px}
+  .summaryKPI .bigNum{font-weight:1000;font-size:18px}
+  .summaryList{border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:12px;background:rgba(0,0,0,.18);color:var(--muted);font-size:12px;line-height:1.45}
+
+
+  /* v2.2 polish: enemy placement flash + line label chip */
+  @keyframes enemyFlash {
+    0%{box-shadow:0 0 0 0 rgba(255,90,106,.0); filter:brightness(1.0)}
+    20%{box-shadow:0 0 0 3px rgba(255,90,106,.35); filter:brightness(1.18)}
+    100%{box-shadow:0 0 0 0 rgba(255,90,106,.0); filter:brightness(1.04)}
+  }
+  .cell.enemyNew{animation:enemyFlash .55s ease-out 1}
+
+
+  /* v2.5 polish: restrained suit colors + placement animation + ghost previews */
+  .suitGlyph{font-weight:1000}
+  .suitSpade{color:rgba(230,235,245,.92)}
+  .suitHeart{color:#d85a63}
+  .suitDiamond{color:#e1a24f}
+  .suitClub{color:#6fbf8a}
+
+  .cell.ghost{
+    border-style:dashed;
+    border-color:rgba(255,255,255,.20);
+  }
+  .cell.ghost .txt{opacity:.88}
+  .cell.ghost .ghostNote{
+    position:absolute;top:6px;right:8px;
+    font-size:9px;letter-spacing:.6px;
+    color:rgba(255,255,255,.20);font-weight:950;
+  }
+
+  @keyframes placeFlip {
+    0%{opacity:0; transform:translateY(6px) rotateY(85deg) scale(.96)}
+    100%{opacity:1; transform:translateY(0) rotateY(0) scale(1)}
+  }
+  @keyframes enemyPlace {
+    0%{opacity:0; transform:translateY(-10px) scale(.98)}
+    100%{opacity:1; transform:translateY(0) scale(1)}
+  }
+  @keyframes centerDeal {
+    0%{opacity:0; transform:scale(.98)}
+    100%{opacity:1; transform:scale(1)}
+  }
+  .cell{transform-style:preserve-3d}
+  .cell.placeAnim{animation:placeFlip .18s ease-out 1}
+  .cell.enemyPlaceAnim{animation:enemyPlace .18s ease-out 1}
+  .cell.centerDeal{animation:centerDeal .16s ease-out 1}
+
+</style>
+</head>
+<body>
+<div class="wrap" id="wrapRoot">
+  <header>
+    <div>
+      <h1>Grid Poker Roguelite v2.6.2 — Ship Hotfix (Single HTML)</h1>
+      <p class="sub">
+        v2.1 adds a “polish pass” to near-max: ranked gold moves (1–3), hover outcomes, a real combat preview,
+        a clear/reset control, micro-juice on hits, and keyboard shortcuts.
+      </p>
+    </div>
+    <div class="btnrow">
+      <button id="btnNew">New Run</button>
+      <button id="btnClear" title="Clear selections (C)">Clear <span class="kbd">C</span></button>
+      <button id="btnCommit" disabled title="Commit (Enter)">Commit <span class="kbd">⏎</span></button>
+      <button id="btnRedraw" disabled title="Redraw (R)">Redraw <span class="kbd">R</span></button>
+      <button id="btnJoker" disabled title="Wild→Joker (J)">Wild → Joker <span class="kbd">J</span></button>
+      <button id="btnPeek" disabled title="Peek (P)">Peek <span class="kbd">P</span></button>
+      <button id="btnShop" disabled title="Shop (S)">Shop <span class="kbd">S</span></button>
+      <button id="btnHelp" title="Help (H)">Help <span class="kbd">H</span></button>
+      <button id="btnMute" title="Toggle sound (M)">Sound: On <span class="kbd">M</span></button>
+      <label class="toggle" title="Training mode shows enemy hand; default is hidden.">
+        <input type="checkbox" id="showEnemyToggle" /> Show enemy hand
+      </label>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="panel">
+      <div class="barTop">
+        <div class="badge">🧍 YOU <span class="tiny" id="runInfo">F1 • Fight 1/2</span></div>
+        <div class="hpWrap" id="youHPWrap">
+          <div class="bar"><div class="fill" id="youHPFill"></div></div>
+          <div class="hpText"><span>HP</span><span id="youHPText">20 / 20</span></div>
+          <div class="dmgPop" id="popYou"></div>
+        </div>
+        <div class="badge">👾 ENEMY <span class="tiny" id="enemyName">—</span></div>
+        <div class="hpWrap" id="enHPWrap">
+          <div class="bar"><div class="fill" id="enHPFill"></div></div>
+          <div class="hpText"><span>HP</span><span id="enHPText">18 / 18</span></div>
+          <div class="dmgPop" id="popEn"></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="boardWrap">
+          <div class="preview" id="previewBox">
+            <div>
+              <b>Combat Preview</b>
+              <div class="hint" id="previewHint">Select 2 cards and 2 BORDER cells. After your first cell, ranked options (1–3) appear.</div>
+              <div class="mini" id="previewMini">
+                <span class="chip">Playable: BORDER only</span>
+                <span class="chip">Commit: +1 Wild</span>
+                <span class="chip">Whiff: +1 redraw next turn</span>
+                <span class="chip" id="lineChip">Line: <span id="lineLabel">—</span></span>
+              </div>
+            </div>
+            <div class="big warn" id="previewBig">—</div>
+          </div>
+
+          <div class="clashStrip" id="clashStrip" aria-live="polite">
+            <div class="side">
+              <span class="tag2" id="clashSide">—</span>
+              <span class="hand" id="clashHand">Ready.</span>
+            </div>
+            <div class="side">
+              <span class="tiny" id="clashDetail">—</span>
+              <span class="dmg" id="clashDmg"> </span>
+            </div>
+          </div>
+
+          <div class="lineBadge" id="lineBadge">—</div>
+
+          <div class="board" id="board"></div>
+        </div>
+
+        <div class="handsRow">
+          <div class="handBox">
+            <div class="handTitle">
+              <b>Your Hand (4)</b>
+              <span class="tiny" id="youStatus">Pick 2 cards + 2 border cells</span>
+            </div>
+            <div class="handCards" id="youHand"></div>
+            <div class="pillRow">
+              <span class="pill">Coins: <span id="coinText">0</span></span>
+              <span class="pill">Wild: <span id="wildText">0/6</span></span>
+              <span class="pill">Redraw: <span id="redrawText">1</span></span>
+              <span class="pill">Armor: <span id="armorText">0</span></span>
+              <span class="pill">Focus: <span id="focusText">0</span></span>
+              <span class="pill">Momentum: <span id="momText">0</span></span>
+            </div>
+          </div>
+
+          <div class="handBox">
+            <div class="handTitle">
+              <b>Enemy Hand</b>
+              <span class="tiny" id="enStatus">Hidden (default). Toggle for training.</span>
+            </div>
+            <div class="handCards" id="enHand"></div>
+            <div class="pillRow">
+              <span class="pill">Your status: <span id="youEffect">—</span></span>
+              <span class="pill">Enemy status: <span id="enEffect">—</span></span>
+              <span class="pill">Enemy intent: <span id="intentText">—</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="panel">
+      <div class="barTop">
+        <div class="badge">🎒 Inventory &amp; Run</div>
+        <div class="statLine">
+          <span>Deck: <b id="deckCount">52</b></span>
+          <span>Border: <b id="borderFill">0/16</b></span>
+          <span>Turn: <b id="turnCount">1</b></span>
+        </div>
+      </div>
+      <div class="content">
+        <div class="sectionTitle">Equipped</div>
+        <div class="list" id="invList"></div>
+        <div class="divider"></div>
+        <div class="sectionTitle">Pro tips</div>
+        <div class="callout">
+          • After you pick <b>2 cards</b> and <b>1 border cell</b>, ranked options appear: <b>1</b> best, then 2, 3. Hover a ranked cell to preview that exact outcome.
+          <br>• <b>Momentum</b>: consecutive scoring turns build Momentum (+1 dmg each, max 3). Whiff resets it.
+          <br>• Keyboard: <span class="kbd">C</span> clear, <span class="kbd">⏎</span> commit, <span class="kbd">R</span> redraw, <span class="kbd">J</span> joker, <span class="kbd">S</span> shop, <span class="kbd">H</span> help.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SHOP -->
+<div class="overlay" id="shopOverlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modalTop">
+      <b id="shopTitle">Shop</b>
+      <div class="btnrow">
+        <span class="badge">Coins: <span id="shopCoins">0</span></span>
+        <button id="btnStartNext" title="Start the next fight now">Start Next Fight</button>
+        <button id="btnCloseShop">Close</button>
+      </div>
+    </div>
+    <div class="modalBody">
+      <div class="twoCol">
+        <div>
+          <div class="sectionTitle">Buy items</div>
+          <div class="list" id="shopList"></div>
+        </div>
+        <div>
+          <div class="sectionTitle">Reward</div>
+          <div class="callout" id="rewardBox">Win a fight to see a reward here.</div>
+          <div class="divider"></div>
+          <div class="sectionTitle">Notes</div>
+          <div class="callout">Items are intentionally one-line “behavior” modifiers (not spreadsheets).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HELP -->
+<div class="overlay" id="helpOverlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modalTop">
+      <b>How to play</b>
+      <div class="btnrow"><button id="btnCloseHelp">Close</button></div>
+    </div>
+    <div class="modalBody">
+      <div class="callout">
+        Goal: defeat enemies by forming poker hands on a 5×5 grid. You place only on the outer BORDER.
+        The center 3×3 is pre-dealt each round.
+      </div>
+      <div class="steps">
+        <div class="step"><b>1) Select 2 cards</b><br><span class="tiny">Click two cards in your hand.</span></div>
+        <div class="step"><b>2) Pick 1 border cell</b><br><span class="tiny">Ranked suggestions (1–3) appear for your best second placement.</span></div>
+        <div class="step"><b>3) Hover ranked cells</b><br><span class="tiny">Hover to preview exact hand & damage before committing.</span></div>
+        <div class="step"><b>4) Commit</b><br><span class="tiny">Commit gives +1 Wild. Whiff gives +1 redraw next turn. Score consecutively to build Momentum.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- SUMMARY -->
+<div class="overlay" id="summaryOverlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="modalTop">
+      <b id="sumTitle">Fight Summary</b>
+      <div class="btnrow">
+        <button id="btnSumContinue">Continue</button>
+        <button id="btnSumNew">New Run</button>
+      </div>
+    </div>
+    <div class="modalBody">
+      <div class="summaryGrid" id="sumGrid"></div>
+      <div class="divider"></div>
+      <div class="summaryList" id="sumLog">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="hoverTip" id="hoverTip"></div>
+
+<script>
+(() => {
+  const $ = (id)=>document.getElementById(id);
+  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+  const choice=(arr)=>arr[Math.floor(Math.random()*arr.length)];
+  const rndInt=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+
+  const wrapRoot = $("wrapRoot");
+  const toastEl = $("toast");
+  const toast=(msg)=>{
+    toastEl.textContent = msg;
+    toastEl.classList.add("on");
+    setTimeout(()=>toastEl.classList.remove("on"), 900);
+  };
+  const shake=()=>{
+    wrapRoot.classList.remove("shake");
+    void wrapRoot.offsetWidth;
+    wrapRoot.classList.add("shake");
+  };
+  const pop = (which, text)=>{
+    const el = which === "EN" ? $("popEn") : $("popYou");
+    el.textContent = text;
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "pop .85s ease-out 1";
+  };
+
+
+  // v2.1 minimal audio (no assets) — WebAudio blips
+  let __audioCtx = null;
+  let __audioEnabled = true;
+  const audioInit = ()=>{
+    if(__audioCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    __audioCtx = new AC();
+  };
+  const blip = (freq=440, dur=0.06, type="sine", gain=0.045)=>{
+    if(!__audioEnabled) return;
+    audioInit();
+    if(!__audioCtx) return;
+    const t0 = __audioCtx.currentTime;
+    const o = __audioCtx.createOscillator();
+    const g = __audioCtx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(__audioCtx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.01);
+  };
+  const sfx = {
+    pick: ()=>blip(660,0.05,"triangle",0.03),
+    clear:()=>blip(220,0.05,"sine",0.028),
+    commit:()=>{ blip(440,0.05,"square",0.03); setTimeout(()=>blip(660,0.07,"square",0.03),40); },
+    hit:  ()=>{ blip(140,0.07,"sawtooth",0.04); setTimeout(()=>blip(90,0.08,"sawtooth",0.03),55); },
+    good: ()=>{ blip(523.25,0.06,"triangle",0.03); setTimeout(()=>blip(783.99,0.09,"triangle",0.03),55); },
+    bad:  ()=>{ blip(180,0.11,"sine",0.04); },
+    open: ()=>blip(500,0.05,"sine",0.02),
+  };
+
+  // v2.1 clash strip
+  const clash = (kind, side, hand, detail, dmgText="")=>{
+    el.clashStrip.classList.remove("good","bad","warn","on");
+    el.clashSide.textContent = side;
+    el.clashHand.textContent = hand;
+    el.clashDetail.textContent = detail || "—";
+    el.clashDmg.textContent = dmgText || "";
+    el.clashStrip.classList.add(kind||"warn","on");
+    setTimeout(()=>el.clashStrip.classList.remove("on"), 1400);
+  };
+
+  // v2.1 hover tooltip
+  const tip = {
+    show:(x,y,html)=>{
+      el.hoverTip.innerHTML = html;
+      const pad = 14;
+      const w = el.hoverTip.offsetWidth || 260;
+      const h = el.hoverTip.offsetHeight || 80;
+      const xx = Math.min(window.innerWidth - w - pad, x + 14);
+      const yy = Math.min(window.innerHeight - h - pad, y + 14);
+      el.hoverTip.style.transform = `translate(${xx}px, ${yy}px)`;
+    },
+    hide:()=>{
+      el.hoverTip.style.transform = "translate(-9999px, -9999px)";
+    }
+  };
+
+  const SUITS = ["♠","♥","♦","♣"];
+  const RANKS = [
+    {r:"A", v:14},{r:"K", v:13},{r:"Q", v:12},{r:"J", v:11},
+    {r:"10", v:10},{r:"9", v:9},{r:"8", v:8},{r:"7", v:7},
+    {r:"6", v:6},{r:"5", v:5},{r:"4", v:4},{r:"3", v:3},{r:"2", v:2},
+  ];
+
+  function buildDeck(){
+    const d=[];
+    for(const s of SUITS){
+      for(const rk of RANKS){
+        d.push({rank: rk.r, val: rk.v, suit: s, id: rk.r+s, joker:false});
+      }
+    }
+    for(let i=d.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [d[i],d[j]]=[d[j],d[i]];
+    }
+    return d;
+  }
+  function ensureDeck(S){
+    if(S.deck.length < 14){
+      S.deck = buildDeck();
+      logLine(S, "\n(Deck reshuffled.)\n");
+    }
+  }
+  function draw(S){ ensureDeck(S); return S.deck.pop(); }
+  function drawToHand(S, actor, n){ while(actor.hand.length < n) actor.hand.push(draw(S)); }
+  function labelCard(c){ return c ? (c.joker ? "Joker" : `${c.rank}${c.suit}`) : "—"; }
+
+  const LINES = (() => {
+    const lines = [];
+    for(let r=0;r<5;r++) lines.push([0,1,2,3,4].map(c=>r*5+c));
+    for(let c=0;c<5;c++) lines.push([0,1,2,3,4].map(r=>r*5+c));
+    lines.push([0,6,12,18,24]);
+    lines.push([4,8,12,16,20]);
+    return lines;
+  })();
+
+  // v2.2+: tiny line labels + enemy intent micro-telegraph (updates per turn)
+  const COL_LET = ["A","B","C","D","E"];
+  function lineLabelFromIndex(li){
+    if(li===undefined || li===null) return "—";
+    if(li>=0 && li<=4) return `Row ${li+1}`;
+    if(li>=5 && li<=9) return `Col ${COL_LET[li-5]}`;
+    if(li===10) return "Diag ↘";
+    if(li===11) return "Diag ↙";
+    return "—";
+  }
+  function suitToClass(s){
+    if(s==="♥") return "suitHeart";
+    if(s==="♦") return "suitDiamond";
+    if(s==="♣") return "suitClub";
+    return "suitSpade";
+  }
+
+
+  function computeEnemyTelegraph(S){
+    if(!S?.en?.hand) return "—";
+    if(S.en.status?.stun>0) return "Stunned — tempo loss";
+
+    const cards = S.en.hand.filter(Boolean);
+    if(cards.length===0) return "—";
+
+    const ranks = {};
+    const suits = {};
+    const vals = [];
+    let jokers = 0;
+
+    for(const c of cards){
+      if(c.joker){ jokers++; continue; }
+      ranks[c.rank] = (ranks[c.rank]||0)+1;
+      suits[c.suit] = (suits[c.suit]||0)+1;
+      vals.push(c.val);
+    }
+    vals.sort((a,b)=>a-b);
+
+    const pairsN = Object.values(ranks).filter(n=>n>=2).length;
+    const hasPair = pairsN>=1;
+    const hasTwoPair = pairsN>=2;
+    const hasTrips = Object.values(ranks).some(n=>n>=3);
+    const hasQuads = Object.values(ranks).some(n=>n>=4);
+
+    const suitMax = Math.max(0, ...Object.values(suits));
+    const flushAngle = suitMax>=3;
+    const flushThreat = suitMax>=4;
+
+    const uniq = [...new Set(vals)].sort((a,b)=>a-b);
+    let bestRun = 1, run=1;
+    for(let i=1;i<uniq.length;i++){
+      if(uniq[i]===uniq[i-1]+1){ run++; bestRun=Math.max(bestRun,run); }
+      else run=1;
+    }
+    const straightAngle = bestRun>=3;
+    const straightThreat = bestRun>=4;
+
+    // Board-derived "pressure" (no hidden info; it's visible to the player)
+    // If any line is 1 border placement away from being complete, enemy has a finisher opportunity.
+    let finisher = false;
+    for(let li=0; li<LINES.length; li++){
+      const line = LINES[li];
+      let empty = 0;
+      let emptyIdx = -1;
+      for(const bi of line){
+        if(!S.board[bi]){ empty++; emptyIdx = bi; }
+      }
+      if(empty===1 && isBorder(emptyIdx)) { finisher = true; break; }
+    }
+
+    // Vocab blend: a hint + a vibe.
+    const arche = S.en.archetype || "balanced";
+
+    if(S.en.status?.poison>0 && (hasPair||straightAngle||flushAngle)) return "Under poison — still swinging";
+    if(hasQuads) return "Quads pressure";
+    if(hasTrips && hasTwoPair) return "Full house angle";
+    if(hasTrips) return "Sets brewing";
+    if(hasTwoPair && flushAngle) return "Two-pair + flush angle";
+    if(hasTwoPair) return "Two-pair angle";
+    if(hasPair && straightAngle) return "Pair + straight angle";
+    if(hasPair && flushAngle) return "Pair + flush angle";
+    if(flushThreat && straightThreat) return finisher ? "Multi-line finisher threat" : "Multi-line threat";
+    if(flushThreat) return finisher ? "Flush finisher threat" : "Flush threat";
+    if(straightThreat) return finisher ? "Straight finisher threat" : "Straight threat";
+    if(flushAngle) return finisher ? "Flush angle — line close" : "Flush angle";
+    if(straightAngle) return finisher ? "Straight angle — line close" : "Straight angle";
+    if(hasPair) return finisher ? "Pairs likely — line close" : "Pairs likely";
+
+    if(jokers>0) return finisher ? "Wildcard chaos — line close" : "Wildcard chaos";
+
+    // Archetype flavor fallback
+    if(arche==="pairs") return finisher ? "Pairs plan — closing" : "Pairs plan";
+    if(arche==="straights") return finisher ? "Straight plan — closing" : "Straight plan";
+    if(arche==="flushes") return finisher ? "Flush plan — closing" : "Flush plan";
+    if(arche==="brute") return finisher ? "Big hit — closing" : "Big hit angle";
+
+    return finisher ? "Closing a line" : "Probing";
+  }
+
+
+
+const BORDER = (() => {
+    const idx=[];
+    for(let c=0;c<5;c++) idx.push(c);
+    for(let r=1;r<4;r++) idx.push(r*5+4);
+    for(let c=4;c>=0;c--) idx.push(4*5+c);
+    for(let r=3;r>=1;r--) idx.push(r*5+0);
+    return idx;
+  })();
+
+  const CORNERS = new Set([0,4,20,24]);
+  const isBorder = (i)=>BORDER.includes(i);
+  const isCenter = (i)=>{ const r=Math.floor(i/5), c=i%5; return (r>=1 && r<=3 && c>=1 && c<=3); };
+
+  function cloneBoard(b){ return b.map(x=>x?{...x}:null); }
+
+  function seedCenter(S, clearFirst=true){
+    if(clearFirst) S.board = Array(25).fill(null);
+    const dealt = [];
+    for(let r=1;r<=3;r++){
+      for(let c=1;c<=3;c++){
+        const idx = r*5+c;
+        S.board[idx] = draw(S);
+        dealt.push(idx);
+      }
+    }
+    S.lastCenterDealt = dealt;
+  }
+
+  function evalHandNoJoker(cards){
+    const vals = cards.map(c=>c.val).sort((a,b)=>b-a);
+    const suits = cards.map(c=>c.suit);
+    const counts = new Map();
+    for(const v of vals) counts.set(v, (counts.get(v)||0)+1);
+
+    const isFlush = suits.every(s=>s===suits[0]);
+    const uniq = [...new Set(vals)].sort((a,b)=>b-a);
+    let isStraight=false, topStraight = uniq[0] ?? 0;
+    if(uniq.length===5){
+      if(uniq[0]-uniq[4]===4){ isStraight=true; topStraight=uniq[0]; }
+      const wheel=[14,5,4,3,2];
+      if(wheel.every(x=>uniq.includes(x))){ isStraight=true; topStraight=5; }
+    }
+
+    const groups = [...counts.entries()].sort((a,b)=>{
+      if(b[1]!==a[1]) return b[1]-a[1];
+      return b[0]-a[0];
+    });
+    const pattern = groups.map(g=>g[1]).join("");
+    const kicker = vals[0]||0;
+
+    let name,tier,base;
+    if(isStraight && isFlush){ name=(topStraight===14 ? "Royal Flush" : "Straight Flush"); tier=9; base=16; }
+    else if(pattern==="41"){ name="Four of a Kind"; tier=8; base=13; }
+    else if(pattern==="32"){ name="Full House"; tier=7; base=11; }
+    else if(isFlush){ name="Flush"; tier=6; base=9; }
+    else if(isStraight){ name="Straight"; tier=5; base=8; }
+    else if(pattern==="311"){ name="Three of a Kind"; tier=4; base=6; }
+    else if(pattern==="221"){ name="Two Pair"; tier=3; base=5; }
+    else if(pattern==="2111"){ name="One Pair"; tier=2; base=3; }
+    else { name="High Card"; tier=1; base=1; }
+
+    const dmg = base + Math.floor((kicker-2)/5);
+    return {name,tier,dmg,kicker};
+  }
+
+  function evalHandBest(cards){
+    const jokers = cards.filter(c=>c && c.joker).length;
+    if(jokers===0) return evalHandNoJoker(cards);
+
+    const existing = new Set(cards.filter(c=>c && !c.joker).map(c=>c.id));
+    let best=null;
+
+    for(const s of SUITS){
+      for(const rk of RANKS){
+        const candidate = {rank:rk.r, val:rk.v, suit:s, id:rk.r+s, joker:false};
+        if(existing.has(candidate.id)) continue;
+        const replaced = cards.map(c=>c && c.joker ? candidate : c);
+        const res = evalHandNoJoker(replaced);
+        if(!best || res.tier>best.tier || (res.tier===best.tier && res.kicker>best.kicker)) best = res;
+      }
+    }
+    best.name = best.name + " (J)";
+    return best;
+  }
+
+  function bestHandFromPlacement(board, placedCells){
+    const [a,b] = placedCells;
+    let best=null;
+    for(let li=0; li<LINES.length; li++){
+      const line = LINES[li];
+      if(!line.includes(a) || !line.includes(b)) continue;
+      const cards = line.map(i=>board[i]);
+      if(cards.some(x=>!x)) continue;
+      const res = evalHandBest(cards);
+      const isDiag = (li >= 10);
+      const cornersInLine = line.some(idx => CORNERS.has(idx));
+      const out = { line, res, isDiag, cornersInLine, lineIndex: li };
+      if(!best || res.tier>best.res.tier || (res.tier===best.res.tier && res.dmg>best.res.dmg)) best = out;
+    }
+    return best;
+  }
+
+  const ITEM_POOL = [
+    { id:"diagonal_sigil", name:"Diagonal Sigil", cost:18, rarity:"Uncommon", desc:"+2 damage if your scoring line is diagonal.", onDamage:(ctx)=> ctx.best?.isDiag ? 2 : 0 },
+    { id:"corner_tax", name:"Corner Tax", cost:14, rarity:"Common", desc:"Gain +1 coin per corner you place on this turn (max 2).", onPlace:(ctx)=>{ const placedCorners = ctx.placedCells.filter(c=>CORNERS.has(c)).length; const gain = Math.min(2, placedCorners); if(gain>0){ ctx.you.coins += gain; ctx.log(`🪙 Corner Tax: +${gain} coin.\n`); } } },
+    { id:"focus_lens", name:"Focus Lens", cost:16, rarity:"Uncommon", desc:"If you whiff, gain +1 Focus (max 5). Each Focus adds +2 dmg to your next hit (consumed).", onWhiff:(ctx)=>{ ctx.you.focus = clamp(ctx.you.focus+1,0,5); ctx.log(`🔍 Focus Lens: +1 Focus (now ${ctx.you.focus}).\n`); } },
+    { id:"wild_drip", name:"Wild Drip", cost:16, rarity:"Common", desc:"+1 extra Wild on every commit.", onCommit:(S)=>{ S.wild = clamp(S.wild+1,0,S.wildMax); } },
+    { id:"armor_plate", name:"Armor Plate", cost:22, rarity:"Rare", desc:"+2 Armor (flat reduction).", onAcquire:(S)=>{ S.you.armor += 2; } },
+    { id:"peek_charm", name:"Peek Charm", cost:18, rarity:"Uncommon", desc:"Unlock Peek: reveal 1 enemy card for 2 turns (once per fight).", onAcquire:(S)=>{ S.you.peekUnlocked = true; } }
+  ];
+
+  function makeShopStock(S){
+    const weighted=[];
+    for(const it of ITEM_POOL){
+      const w = (it.rarity==="Common")?4:(it.rarity==="Uncommon")?2:1;
+      for(let k=0;k<w;k++) weighted.push(it);
+    }
+    const picks = new Map();
+    while(picks.size < 4){
+      const it = choice(weighted);
+      picks.set(it.id, it);
+    }
+    return [...picks.values()];
+  }
+  function cloneItem(it){ return JSON.parse(JSON.stringify(it)); }
+
+  const ENEMIES = [
+    {name:"Slime", hp:18, atkBias:0.68, archetype:"balanced", intent:"??"},
+    {name:"Goblin", hp:20, atkBias:0.74, archetype:"pairs", intent:"Pairs"},
+    {name:"Wisp", hp:19, atkBias:0.76, archetype:"straights", intent:"Straights"},
+    {name:"Siren", hp:22, atkBias:0.74, archetype:"flushes", intent:"Flushes"},
+    {name:"Boss: Chaos Knight", hp:32, atkBias:0.80, archetype:"brute", intent:"Big hands"},
+  ];
+
+  function archetypeBonus(archetype, handTier){
+    if(!handTier) return 0;
+    if(archetype==="pairs")    return (handTier>=2 && handTier<=4) ? 22 : 0;
+    if(archetype==="straights")return (handTier===5) ? 28 : (handTier>=6 ? 10 : 0);
+    if(archetype==="flushes")  return (handTier===6) ? 28 : (handTier>=7 ? 10 : 0);
+    if(archetype==="brute")    return (handTier>=6) ? 22 : (handTier>=4 ? 10 : 0);
+    return 0;
+  }
+
+  const el = {
+    board:$("board"), youHand:$("youHand"), enHand:$("enHand"), log:$("log"),
+    youHPFill:$("youHPFill"), enHPFill:$("enHPFill"), youHPText:$("youHPText"), enHPText:$("enHPText"),
+    runInfo:$("runInfo"), enemyName:$("enemyName"),
+    deckCount:$("deckCount"), borderFill:$("borderFill"), turnCount:$("turnCount"),
+    youStatus:$("youStatus"), enStatus:$("enStatus"),
+    coinText:$("coinText"), wildText:$("wildText"), redrawText:$("redrawText"), armorText:$("armorText"), focusText:$("focusText"), momText:$("momText"),
+    youEffect:$("youEffect"), enEffect:$("enEffect"), intentText:$("intentText"), lineLabel:$("lineLabel"), lineChip:$("lineChip"), lineBadge:$("lineBadge"),
+    btnNew:$("btnNew"), btnClear:$("btnClear"), btnCommit:$("btnCommit"), btnRedraw:$("btnRedraw"), btnJoker:$("btnJoker"), btnPeek:$("btnPeek"),
+    btnShop:$("btnShop"), btnHelp:$("btnHelp"),
+    showEnemyToggle:$("showEnemyToggle"),
+    invList:$("invList"),
+    shopOverlay:$("shopOverlay"), shopTitle:$("shopTitle"), shopCoins:$("shopCoins"), shopList:$("shopList"), rewardBox:$("rewardBox"), btnStartNext:$("btnStartNext"), btnCloseShop:$("btnCloseShop"),
+    helpOverlay:$("helpOverlay"), btnCloseHelp:$("btnCloseHelp"),
+    previewBox:$("previewBox"), previewHint:$("previewHint"), previewBig:$("previewBig"), previewMini:$("previewMini"),
+    clashStrip:$("clashStrip"), clashSide:$("clashSide"), clashHand:$("clashHand"), clashDetail:$("clashDetail"), clashDmg:$("clashDmg"),
+    hoverTip:$("hoverTip"),
+    btnMute:$("btnMute"),
+    summaryOverlay:$("summaryOverlay"), sumTitle:$("sumTitle"), sumGrid:$("sumGrid"), sumLog:$("sumLog"), btnSumContinue:$("btnSumContinue"), btnSumNew:$("btnSumNew"),
+  };
+
+  function logLine(S, msg){
+    el.log.textContent += msg;
+    el.log.scrollTop = el.log.scrollHeight;
+  }
+
+  const statusString=(st)=>{
+    const parts=[];
+    if(st.stun>0) parts.push(`Stun(${st.stun})`);
+    if(st.poison>0) parts.push(`Poison(${st.poison})`);
+    return parts.length?parts.join(", "):"—";
+  };
+
+  function poisonTick(actor, label, S){
+    if(actor.status.poison>0){
+      actor.hp = clamp(actor.hp-1, 0, actor.hpMax);
+      actor.status.poison--;
+      // Make poison feel distinct from "hits" (no shake, different pop text)
+      if(label==="You") pop("YOU", `-1 ☠`);
+      else pop("EN", `-1 ☠`);
+      logLine(S, `☠️ ${label} takes 1 poison damage. (${actor.status.poison} left)
+`);
+    }
+  }
+
+  // Item hooks
+  function itemsOnCommit(S){ for(const it of S.you.items) if(it.onCommit) it.onCommit(S); }
+  function itemsOnAcquire(S, item){ if(item.onAcquire) item.onAcquire(S); }
+  function itemsOnPlace(S, placedCells){ const ctx={you:S.you,en:S.en,placedCells,log:(m)=>logLine(S,m)}; for(const it of S.you.items) if(it.onPlace) it.onPlace(ctx); }
+  function itemsOnWhiff(S){ const ctx={you:S.you,en:S.en,log:(m)=>logLine(S,m)}; for(const it of S.you.items) if(it.onWhiff) it.onWhiff(ctx); }
+  function itemsDamageBonus(S, best){ const ctx={you:S.you,en:S.en,best,log:(m)=>logLine(S,m)}; let add=0; for(const it of S.you.items) if(it.onDamage) add += (it.onDamage(ctx)||0); return add; }
+
+  function denialScoreIfOccupy(S, cell){
+    let score = 0;
+    for(const line of LINES){
+      if(!line.includes(cell)) continue;
+      const cards = line.map(i=>S.board[i]);
+      const filled = cards.filter(Boolean).length;
+      if(filled===4 && !S.board[cell]) score += 10;
+    }
+    return score;
+  }
+
+  function chooseEnemyMove(S){
+    const emptyBorders = BORDER.filter(i=>!S.board[i]);
+    if(emptyBorders.length < 2) return null;
+
+    let bestMove=null;
+
+    for(let i=0;i<4;i++){
+      for(let j=i+1;j<4;j++){
+        const cardA = S.en.hand[i], cardB = S.en.hand[j];
+        for(let a=0;a<emptyBorders.length;a++){
+          for(let b=a+1;b<emptyBorders.length;b++){
+            const cellA = emptyBorders[a], cellB = emptyBorders[b];
+            const tmp = cloneBoard(S.board);
+            tmp[cellA]=cardA; tmp[cellB]=cardB;
+
+            const best = bestHandFromPlacement(tmp, [cellA, cellB]);
+
+            let score = 0;
+            score += denialScoreIfOccupy(S, cellA)*0.55 + denialScoreIfOccupy(S, cellB)*0.55;
+
+            if(best){
+              score += (best.res.dmg*10 + best.res.tier*26) * S.en.atkBias;
+              score += archetypeBonus(S.en.archetype, best.res.tier);
+            } else {
+              score += 2 + (CORNERS.has(cellA)?1:0) + (CORNERS.has(cellB)?1:0);
+            }
+            score += Math.random()*0.4;
+
+            if(!bestMove || score>bestMove.score) bestMove = {score, cardIdxA:i, cardIdxB:j, cellA, cellB, best};
+          }
+        }
+      }
+    }
+    return bestMove;
+  }
+
+  // Compute outcome if we commit with two cards + two cells (best swap)
+  function computeOutcome(S, cards, cells){
+    const [c1,c2] = cells;
+    const [A,B] = cards;
+    let bestOverall=null;
+    for(const swap of [0,1]){
+      const tmp = cloneBoard(S.board);
+      tmp[c1] = swap===0 ? A : B;
+      tmp[c2] = swap===0 ? B : A;
+      const best = bestHandFromPlacement(tmp, [c1,c2]);
+      if(best){
+        const focusBonus = (S.you.focus>0) ? (S.you.focus*2) : 0;
+        const itemBonus = itemsDamageBonus(S, best);
+        const momentumBonus = S.you.momentum || 0;
+        const total = best.res.dmg + itemBonus + focusBonus + momentumBonus;
+        const candidate = { best, total, name: best.res.name, base: best.res.dmg, itemBonus, focusBonus, momentumBonus, swap };
+        if(!bestOverall || best.res.tier>bestOverall.best.res.tier || (best.res.tier===bestOverall.best.res.tier && total>bestOverall.total)) bestOverall = candidate;
+      }
+    }
+    return bestOverall;
+  }
+
+  // Preview system + ranked hints
+  function updatePreview(S){
+    S.preview = null;
+    S.lastHighlightLine = null;
+    S.hoverLine = null;
+    S.possibleCells = new Set();
+    S.ranked = new Map(); // cell -> rank 1..3
+    S.cellOutcomes = new Map(); // cell -> outcome
+
+    const cardIdx = [...S.selectedHandIdx];
+    const cells = [...S.selectedCells];
+
+    if(cardIdx.length<2){
+      S.preview = { mode:"GUIDE", title:"Select 2 cards", text:`Cards selected: ${cardIdx.length}/2. Then pick BORDER cells.` };
+      return;
+    }
+
+    const cards = [S.you.hand[cardIdx[0]], S.you.hand[cardIdx[1]]];
+
+    if(cells.length===0){
+      S.preview = { mode:"GUIDE", title:"Pick a BORDER cell", text:"Pick 1 empty BORDER cell. Ranked options (1–3) appear for your best second placement." };
+      return;
+    }
+
+    if(cells.length===1){
+      const [c1] = cells;
+      const empties = BORDER.filter(i=>!S.board[i] && i!==c1);
+      const moves=[];
+
+      for(const c2 of empties){
+        const out = computeOutcome(S, cards, [c1,c2]);
+        if(out){
+          S.possibleCells.add(c2);
+          S.cellOutcomes.set(c2, out);
+          moves.push({cell:c2, ...out});
+        }
+      }
+
+      if(moves.length){
+        moves.sort((m1,m2)=>{
+          const t = m2.best.res.tier - m1.best.res.tier;
+          if(t!==0) return t;
+          return m2.total - m1.total;
+        });
+
+        const top = moves.slice(0,3);
+        top.forEach((m,idx)=>S.ranked.set(m.cell, idx+1));
+
+        const best = top[0];
+        S.preview = {
+          mode:"PARTIAL",
+          title:"Pick your 2nd cell",
+          text:`Ranked best: (1) ${best.name} → ${best.total} dmg. Hover 1–3 to preview.`,
+          best
+        };
+      } else {
+        S.preview = { mode:"PARTIAL", title:"No hand possible", text:"No second cell completes a 5-card line. You can still commit for Wild + setup redraw." };
+      }
+      return;
+    }
+
+    if(cells.length===2){
+      const out = computeOutcome(S, cards, cells);
+      if(out){
+        S.preview = { mode:"FULL", ...out };
+        S.lastHighlightLine = out.best.line;
+      } else {
+        S.preview = { mode:"WHIFF", title:"No complete line", text:"Commit gives +1 Wild, and you’ll get +1 redraw next turn." };
+      }
+    }
+  }
+
+  function refreshBoardRound(S){
+    seedCenter(S, true);
+    S.selectedHandIdx.clear();
+    S.selectedCells.clear();
+    S.lastHighlightLine=null;
+    S.preview=null;
+    S.possibleCells = new Set();
+    S.ranked = new Map();
+    S.cellOutcomes = new Map();
+    S.hoverOutcome = null;
+
+    S.en.revealTurns = Math.max(0, S.en.revealTurns-1);
+
+    drawToHand(S, S.you, 4);
+    drawToHand(S, S.en, 4);
+    logLine(S, "🧱 Border filled → board refreshes (new center).\n");
+  }
+
+  function endOfTurn(S){
+    const borderFilled = BORDER.every(i=>!!S.board[i]);
+    if(borderFilled) refreshBoardRound(S);
+
+    const bonus = S.you.redrawBonusNext || 0;
+    S.you.redrawBonusNext = 0;
+    S.you.redrawLeft = clamp(S.you.redrawMax + bonus, 0, 3);
+
+    if(S.en.revealTurns>0) S.en.revealTurns--;
+
+    S.turn++;
+  }
+
+  function canPeek(S){ return !!S.you.peekUnlocked && (S.you.peekUsedThisFight===false); }
+
+  function doPeek(S){
+    if(!canPeek(S)) return;
+    S.you.peekUsedThisFight = true;
+    S.en.revealTurns = 2;
+    S.en.revealIndex = rndInt(0,3);
+    logLine(S, "👁️ Peek: 1 enemy card revealed for 2 turns.\n");
+    toast("Peek");
+    sfx.open();
+    renderAll(S);
+  }
+
+  function redrawHand(S){
+    if(S.gameOver || S.phase!=="BATTLE") return;
+    if(S.you.redrawLeft<=0) return;
+    if(S.you.status.stun>0){ toast("Stunned"); return; }
+
+    // Return cards to deck (simple) then reshuffle
+    S.deck.push(...S.you.hand.map(c=>({...c, joker:false})));
+    for(let i=S.deck.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]];
+    }
+    S.you.hand = [];
+    drawToHand(S, S.you, 4);
+
+    S.you.redrawLeft--;
+    S.selectedHandIdx.clear();
+    S.selectedCells.clear();
+    S.hoverOutcome = null;
+    S.hoverCell = null;
+    updatePreview(S);
+    logLine(S, "🔁 Redraw used.\n");
+    toast("Redraw");
+    sfx.open();
+    renderAll(S);
+  }
+
+  function useWildToJoker(S){
+    if(S.wild < S.wildMax) return;
+    let idx = [...S.selectedHandIdx][0];
+    if(idx===undefined) idx = 0;
+    const c = S.you.hand[idx];
+    if(!c){ toast("No card"); return; }
+
+    c.joker = true;
+    c.rank = "★"; c.suit = ""; c.val = 0;
+    c.id = "JOKER_"+Math.random().toString(16).slice(2);
+
+    S.wild = 0;
+    logLine(S, "🃏 Wild spent → one card becomes a Joker.\n");
+    toast("Joker");
+    sfx.open();
+    updatePreview(S);
+    renderAll(S);
+  }
+
+  function toggleHandPick(S, idx){
+    if(S.gameOver || S.phase!=="BATTLE") return;
+    if(S.you.status.stun>0) return;
+
+    sfx.pick();
+    if(S.selectedHandIdx.has(idx)) S.selectedHandIdx.delete(idx);
+    else{
+      if(S.selectedHandIdx.size>=2){ toast("Pick only 2 cards"); return; }
+      S.selectedHandIdx.add(idx);
+    }
+    S.hoverOutcome = null;
+    S.hoverCell = null;
+    updatePreview(S);
+    renderAll(S);
+  }
+
+  function toggleCellPick(S, i){
+    if(S.gameOver || S.phase!=="BATTLE") return;
+    if(S.you.status.stun>0) return;
+
+    if(!isBorder(i)){ toast("Only BORDER cells"); return; }
+    if(S.board[i]){ toast("Cell occupied"); return; }
+
+    sfx.pick();
+    if(S.selectedCells.has(i)) S.selectedCells.delete(i);
+    else{
+      if(S.selectedCells.size>=2){ toast("Pick only 2 border cells"); return; }
+      S.selectedCells.add(i);
+    }
+    S.hoverOutcome = null;
+    S.hoverCell = null;
+    updatePreview(S);
+    renderAll(S);
+  }
+
+  function clearSelection(S){
+    S.selectedHandIdx.clear();
+    S.selectedCells.clear();
+    S.lastHighlightLine = null;
+    S.possibleCells = new Set();
+    S.ranked = new Map();
+    S.cellOutcomes = new Map();
+    S.hoverOutcome = null;
+    S.hoverCell = null;
+    updatePreview(S);
+    renderAll(S);
+  }
+
+  function commitTurn(S){
+    if(S.gameOver || S.phase!=="BATTLE") return;
+
+    poisonTick(S.you, "You", S);
+    if(S.you.hp<=0){ loseRun(S); return; }
+
+    if(S.you.status.stun>0){
+      S.you.status.stun--;
+      logLine(S, "😵 You are stunned and lose your turn.\n");
+      enemyTurn(S);
+      endOfTurn(S);
+      renderAll(S);
+      return;
+    }
+
+    if(S.selectedHandIdx.size!==2 || S.selectedCells.size!==2){ toast("Need 2 cards + 2 cells"); return; }
+    sfx.commit();
+    S.stats.fightTurns++;
+
+    const handIdx = [...S.selectedHandIdx].sort((a,b)=>b-a);
+    const cards = [S.you.hand[handIdx[0]], S.you.hand[handIdx[1]]];
+    S.you.hand.splice(handIdx[0],1);
+    S.you.hand.splice(handIdx[1],1);
+
+    const [cell1,cell2] = [...S.selectedCells];
+    S.board[cell1]=cards[0];
+    S.board[cell2]=cards[1];
+    S.lastPlayerPlaced = [cell1, cell2];
+
+    itemsOnPlace(S, [cell1,cell2]);
+
+    // Always +1 Wild
+    S.wild = clamp(S.wild + 1, 0, S.wildMax);
+    // onCommit hooks
+    for(const it of S.you.items) if(it.onCommit) it.onCommit(S);
+
+    const best = bestHandFromPlacement(S.board, [cell1,cell2]);
+
+    if(!best){
+      logLine(S, `You place ${labelCard(cards[0])} & ${labelCard(cards[1])} — no complete line. (Wild +1)\n`);
+      S.you.redrawBonusNext = 1;
+      itemsOnWhiff(S);
+      S.you.momentum = 0; // reset
+      S.stats.whiffs++;
+      clash("warn","YOU","Whiff", "No complete line", "+Redraw next");
+      toast("Whiff (+redraw)");
+      sfx.bad();
+    } else {
+      const focusBonus = (S.you.focus>0) ? (S.you.focus*2) : 0;
+      const itemBonus = itemsDamageBonus(S, best);
+      const momentumBonus = S.you.momentum || 0;
+      let dmg = best.res.dmg + itemBonus + focusBonus + momentumBonus;
+
+      if(S.you.focus>0){
+        logLine(S, `🎯 Focus adds +${focusBonus} damage (consumed).\n`);
+        S.you.focus = 0;
+      }
+
+      S.en.hp = clamp(S.en.hp - dmg, 0, S.en.hpMax);
+      logLine(S, `🗡️ You play ${best.res.name} → ${dmg} damage (Base ${best.res.dmg}${itemBonus?` +${itemBonus} items`:``}${momentumBonus?` +${momentumBonus} momentum`:``}${focusBonus?` +${focusBonus} focus`:``}). (Wild +1)\n`);
+      pop("EN", `-${dmg}`);
+      shake();
+      S.stats.dealt += dmg;
+      S.stats.youHands.push(best.res.name);
+      if(dmg > S.stats.bestHit.dmg) S.stats.bestHit = {dmg, name: best.res.name};
+      clash("good","YOU", best.res.name, `Base ${best.res.dmg}${itemBonus?` +${itemBonus} items`:``}${momentumBonus?` +${momentumBonus} mom`:``}${focusBonus?` +${focusBonus} focus`:``}`, `-${dmg}`);
+      sfx.hit();
+      sfx.good();
+
+      // Momentum: reward streak play
+      S.you.momentum = clamp((S.you.momentum||0) + 1, 0, 3);
+
+      if(S.en.hp<=0){ winFight(S); return; }
+    }
+
+    S.selectedHandIdx.clear();
+    S.selectedCells.clear();
+    S.lastHighlightLine = null;
+    S.possibleCells = new Set();
+    S.ranked = new Map();
+    S.cellOutcomes = new Map();
+    S.hoverOutcome = null;
+    S.hoverCell = null;
+    updatePreview(S);
+
+    drawToHand(S, S.you, 4);
+
+    enemyTurn(S);
+    endOfTurn(S);
+    renderAll(S);
+  }
+
+  function enemyTurn(S){
+    // Surprise polish: tiny "enemy turn" beat so it *feels* like the opponent is acting
+    clash("warn", S.en.name, "Enemy turn…", computeEnemyTelegraph(S), "");
+    if(S.gameOver) return;
+
+    poisonTick(S.en, S.en.name, S);
+    if(S.en.hp<=0){ winFight(S); return; }
+
+    if(S.en.status.stun>0){
+      S.en.status.stun--;
+      logLine(S, `😵 ${S.en.name} is stunned and loses its turn.\n`);
+      drawToHand(S, S.en, 4);
+      return;
+    }
+
+    const move = chooseEnemyMove(S);
+    if(!move){
+      logLine(S, `${S.en.name} hesitates… board refreshes.\n`);
+      refreshBoardRound(S);
+      return;
+    }
+
+    const {cardIdxA, cardIdxB, cellA, cellB, best} = move;
+    const idxs = [cardIdxA, cardIdxB].sort((a,b)=>b-a);
+    const cards = [S.en.hand[idxs[0]], S.en.hand[idxs[1]]];
+    S.en.hand.splice(idxs[0],1);
+    S.en.hand.splice(idxs[1],1);
+
+    S.board[cellA]=cards[0];
+    S.board[cellB]=cards[1];
+    S.lastEnemyPlaced = [cellA, cellB];
+
+    if(!best){
+      logLine(S, `👾 ${S.en.name} places ${labelCard(cards[0])} & ${labelCard(cards[1])} — no complete line.\n`);
+    } else {
+      const hand = best.res;
+      let dmg = hand.dmg;
+      dmg = Math.max(0, dmg - S.you.armor);
+
+      S.you.hp = clamp(S.you.hp - dmg, 0, S.you.hpMax);
+      logLine(S, `👾 ${S.en.name} plays ${hand.name} → ${dmg} damage (Armor -${S.you.armor}).\n`);
+      pop("YOU", `-${dmg}`);
+      shake();
+      S.stats.taken += dmg;
+      S.stats.enHands.push(hand.name);
+      clash("bad", S.en.name, hand.name, `Armor -${S.you.armor}`, `-${dmg}`);
+      sfx.hit();
+
+      if(S.en.archetype==="brute" && hand.tier>=6){
+        if(Math.random()<0.30){ S.you.status.stun = Math.max(S.you.status.stun, 1); logLine(S, "⚠️ Heavy impact: you are stunned next turn.\n"); }
+      }
+      if(S.en.archetype==="straights" && hand.tier>=5){
+        S.you.status.poison = Math.max(S.you.status.poison, 2);
+        logLine(S, "☠️ Arcane cut: you are poisoned (2).\n");
+      }
+      if(S.en.archetype==="flushes" && hand.tier>=6){
+        if(Math.random()<0.30){ S.you.status.stun = Math.max(S.you.status.stun, 1); logLine(S, "🌊 Daze: you are stunned next turn.\n"); }
+      }
+
+      if(S.you.hp<=0){ loseRun(S); return; }
+    }
+
+    drawToHand(S, S.en, 4);
+  }
+
+  function pickEnemyFor(S){
+    if(S.floor===2 && S.fightIndex===1) return ENEMIES.find(e=>e.name.startsWith("Boss"));
+    const pool = ENEMIES.filter(e=>!e.name.startsWith("Boss"));
+    return pool[(S.floor*3 + S.fightIndex) % pool.length];
+  }
+
+  function startFight(S, template){
+    S.en = {
+      name: template.name,
+      hpMax: template.hp, hp: template.hp,
+      atkBias: template.atkBias, archetype: template.archetype,
+      intent: template.intent,
+      hand: [],
+      status:{stun:0, poison:0},
+      revealTurns:0, revealIndex:null
+    };
+
+    seedCenter(S, true);
+    S.you.hand = []; S.en.hand = [];
+    drawToHand(S, S.you, 4);
+    drawToHand(S, S.en, 4);
+
+    S.turn = 1;
+    S.selectedHandIdx.clear();
+    S.selectedCells.clear();
+    S.lastHighlightLine = null;
+    S.possibleCells = new Set();
+    S.ranked = new Map();
+    S.cellOutcomes = new Map();
+    S.hoverOutcome = null;
+    S.hoverCell = null;
+    updatePreview(S);
+
+    S.you.peekUsedThisFight = false;
+
+    el.enemyName.textContent = S.en.name;
+    // reset fight stats
+    S.stats = {fightTurns:0,dealt:0,taken:0,whiffs:0,bestHit:{dmg:0,name:"—"},youHands:[],enHands:[]};
+    logLine(S, `\n⚔️ Encounter: ${S.en.name} (${S.en.intent})\n`);
+  }
+
+  function winFight(S){
+    const coinReward = rndInt(10, 15) + (S.floor-1)*2 + (S.en.name.startsWith("Boss")?8:0);
+    S.you.coins += coinReward;
+    S.en.hp = 0;
+    logLine(S, `\n✅ ${S.en.name} defeated. +${coinReward} coins.\n`);
+
+    if(Math.random() < 0.60){
+      const owned = new Set(S.you.items.map(i=>i.id));
+      const pool = ITEM_POOL.filter(i=>!owned.has(i.id));
+      const drop = pool.length ? choice(pool) : choice(ITEM_POOL);
+      S.pendingReward = { type:"ITEM", item: drop };
+      logLine(S, `🎁 Reward: ${drop.name} (claim in Shop)\n`);
+    } else {
+      S.pendingReward = { type:"HEAL", amount: 3 };
+      logLine(S, `🎁 Reward: Heal +3 (claim in Shop)\n`);
+    }
+
+    S.fightIndex++;
+    if(S.floor===2 && S.fightIndex>=2){
+      S.gameOver = true;
+      logLine(S, "\n🏆 Run cleared (demo complete)!\n");
+      toast("Cleared!");
+      renderAll(S);
+      return;
+    }
+    if(S.fightIndex>=2){
+      S.floor++;
+      S.fightIndex=0;
+      S.you.hp = clamp(S.you.hp + 4, 0, S.you.hpMax);
+      logLine(S, `\n⬇️ Floor ${S.floor} (Heal +4)\n`);
+    }
+
+    // v2.1 end-of-fight summary
+    // Prepare next fight (so UI can show what's coming)
+    S.nextEnemyTemplate = pickEnemyFor(S);
+
+    S.afterSummary = ()=>openShop(S, "Between fights");
+    openSummary(S, "WIN");
+  }
+
+  function loseRun(S){
+    S.gameOver = true;
+    logLine(S, "\n💀 Defeat. Run over.\n");
+    toast("Defeat");
+    S.afterSummary = null;
+    openSummary(S, "LOSE");
+    renderAll(S);
+  }
+
+
+  function openSummary(S, kind){
+    // kind: "WIN" | "LOSE"
+    const title = kind==="WIN" ? `✅ Victory — ${S.en.name}` : `💀 Defeat — ${S.en?.name||"—"}`;
+    el.sumTitle.textContent = title;
+
+    const kpi = [
+      {k:"Turns", v:String(S.stats.fightTurns)},
+      {k:"Damage dealt", v:String(S.stats.dealt)},
+      {k:"Damage taken", v:String(S.stats.taken)},
+      {k:"Whiffs", v:String(S.stats.whiffs)},
+      {k:"Best hit", v:`${S.stats.bestHit.name} (${S.stats.bestHit.dmg})`},
+      {k:"Coins", v:`${S.you.coins}`}
+    ];
+
+    el.sumGrid.innerHTML = "";
+    for(const x of kpi){
+      const d = document.createElement("div");
+      d.className = "summaryKPI";
+      d.innerHTML = `<div><b>${x.k}</b><div class="tiny">This fight</div></div><div class="bigNum">${x.v}</div>`;
+      el.sumGrid.appendChild(d);
+    }
+
+    const topHands = (arr)=> {
+      const m = new Map();
+      arr.forEach(n=>m.set(n,(m.get(n)||0)+1));
+      return [...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,4).map(([n,c])=>`${n}×${c}`).join(", ") || "—";
+    };
+
+    el.sumLog.textContent =
+`Floor ${S.floor} • Fight ${S.fightIndex+1}/2
+Enemy: ${S.en.name} (${S.en.intent})
+Your top hands: ${topHands(S.stats.youHands)}
+Enemy top hands: ${topHands(S.stats.enHands)}
+Items: ${S.you.items.map(i=>i.name).join(", ") || "None"}`;
+
+    el.summaryOverlay.classList.add("on");
+    sfx.open();
+    if(kind==="WIN") sfx.good(); else sfx.bad();
+  }
+
+  function closeSummary(S){
+    el.summaryOverlay.classList.remove("on");
+    const fn = S.afterSummary;
+    S.afterSummary = null;
+    if(fn) fn();
+  }
+
+  function openShop(S, title="Shop"){
+    if(S.gameOver) return;
+    S.phase = "SHOP";
+    const nextName = S.nextEnemyTemplate ? ` • Next: ${S.nextEnemyTemplate.name}` : "";
+    el.shopTitle.textContent = title + nextName;
+    el.shopOverlay.classList.add("on");
+    renderShop(S);
+    renderAll(S);
+  }
+
+  function closeShop(S){
+    el.shopOverlay.classList.remove("on");
+    S.phase = "BATTLE";
+    renderAll(S);
+  }
+
+  function claimPendingReward(S){
+    if(!S.pendingReward) return;
+    const r = S.pendingReward;
+    if(r.type==="ITEM"){
+      const it = cloneItem(r.item);
+      S.you.items.push(it);
+      itemsOnAcquire(S, it);
+      logLine(S, `🎒 Acquired: ${it.name}\n`);
+      toast(`Got: ${it.name}`);
+    } else if(r.type==="HEAL"){
+      S.you.hp = clamp(S.you.hp + r.amount, 0, S.you.hpMax);
+      logLine(S, `✨ Reward heal: +${r.amount}\n`);
+      toast(`Healed +${r.amount}`);
+    }
+    S.pendingReward = null;
+  }
+
+  function renderShop(S){
+    el.shopCoins.textContent = String(S.you.coins);
+    if(el.btnStartNext) el.btnStartNext.style.display = S.nextEnemyTemplate ? "inline-flex" : "none";
+
+    if(S.pendingReward){
+      const r = S.pendingReward;
+      if(r.type==="ITEM"){
+        el.rewardBox.innerHTML = `<b>Reward:</b> ${r.item.name}<br><span class="tiny">${r.item.desc}</span><br><br><button id="btnClaimReward">Claim reward</button>`;
+      } else {
+        el.rewardBox.innerHTML = `<b>Reward:</b> Heal +${r.amount}<br><span class="tiny">Small recovery between fights.</span><br><br><button id="btnClaimReward">Claim reward</button>`;
+      }
+      setTimeout(()=>{
+        const btn = document.getElementById("btnClaimReward");
+        if(btn) btn.onclick = ()=>{ claimPendingReward(S); renderShop(S); renderAll(S); };
+      },0);
+    } else {
+      el.rewardBox.textContent = "No pending reward.";
+    }
+
+    if(!S.shopStock || S.shopStamp !== `${S.floor}-${S.fightIndex}`){
+      S.shopStock = makeShopStock(S);
+      S.shopStamp = `${S.floor}-${S.fightIndex}`;
+    }
+
+    el.shopList.innerHTML = "";
+    for(const it of S.shopStock){
+      const owned = S.you.items.some(x=>x.id===it.id);
+      const row = document.createElement("div");
+      row.className = "itemRow";
+      row.innerHTML = `
+        <div>
+          <b>${it.name} ${owned ? "✓" : ""}</b>
+          <small>${it.desc}</small>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="tag">${it.rarity}</span>
+          <span class="pill">Cost: ${it.cost}</span>
+          <button ${owned || S.you.coins<it.cost ? "disabled":""}>Buy</button>
+        </div>
+      `;
+      row.querySelector("button").onclick = ()=>{
+        if(owned || S.you.coins<it.cost) return;
+        S.you.coins -= it.cost;
+        const bought = cloneItem(it);
+        S.you.items.push(bought);
+        itemsOnAcquire(S, bought);
+        logLine(S, `🛒 Bought: ${bought.name}\n`);
+        toast(`Bought: ${bought.name}`);
+        renderShop(S);
+        renderAll(S);
+      };
+      el.shopList.appendChild(row);
+    }
+  }
+
+  // RENDER
+  function setLineUI(label){
+    const v = label || "—";
+    el.lineLabel.textContent = v;
+    const active = v !== "—";
+    if(el.lineChip) el.lineChip.classList.toggle("active", active);
+    if(el.lineBadge){
+      el.lineBadge.textContent = v;
+      el.lineBadge.classList.toggle("on", active);
+    }
+  }
+
+  function renderPreview(S){
+    const p = S.preview;
+
+    // If hovering a ranked cell, show that outcome explicitly
+    const hover = S.hoverOutcome;
+
+    if(hover){
+      const detail = `Base ${hover.base}`
+        + (hover.itemBonus?` +${hover.itemBonus} items`:"")
+        + (hover.momentumBonus?` +${hover.momentumBonus} momentum`:"")
+        + (hover.focusBonus?` +${hover.focusBonus} focus`:"");
+      el.previewBig.textContent = `${hover.name} → ${hover.total} dmg`;
+      el.previewHint.textContent = `Hover preview. ${detail}. Click to select this cell.`;
+      el.previewBig.className = "big good";
+      setLineUI(lineLabelFromIndex(hover.best?.lineIndex));
+      return;
+    }
+
+    if(!p){
+      el.previewBig.textContent = "—";
+      el.previewHint.textContent = "Select 2 cards and 2 BORDER cells. Ranked options appear after your first cell.";
+      el.previewBig.className = "big warn";
+      setLineUI("—");
+      return;
+    }
+
+    if(p.mode==="FULL"){
+      const detail = `Base ${p.base}`
+        + (p.itemBonus?` +${p.itemBonus} items`:"")
+        + (p.momentumBonus?` +${p.momentumBonus} momentum`:"")
+        + (p.focusBonus?` +${p.focusBonus} focus`:"");
+      el.previewBig.textContent = `${p.name} → ${p.total} dmg`;
+      el.previewHint.textContent = `Commit now. (${detail}). Commit also gives +1 Wild.`;
+      el.previewBig.className = "big good";
+      setLineUI(lineLabelFromIndex(p.best?.lineIndex));
+      return;
+    }
+
+    el.previewBig.textContent = p.title || "—";
+    el.previewHint.textContent = p.text || "";
+    el.previewBig.className = "big warn";
+  }
+
+  function renderBoard(S){
+    el.board.innerHTML = "";
+    for(let i=0;i<25;i++){
+      const card = S.board[i];
+      const cell = document.createElement("div");
+      const cls = ["cell"];
+      if(!card) cls.push("empty");
+      if(isCenter(i)) cls.push("center");
+      if(isBorder(i)) cls.push("border");
+      if(S.gameOver || S.phase!=="BATTLE") cls.push("disabled");
+      if(S.selectedCells.has(i)) cls.push("sel");
+      if(S.lastHighlightLine && S.lastHighlightLine.includes(i)) cls.push("hl");
+      if(S.hoverLine && S.hoverLine.includes(i)) cls.push("lineHover");
+      if(S.possibleCells && S.possibleCells.has(i)) cls.push("possible");
+      if(S.lastEnemyPlaced && S.lastEnemyPlaced.includes(i)){ cls.push("enemyPlaceAnim"); cls.push("enemyNew"); }
+      if(S.lastPlayerPlaced && S.lastPlayerPlaced.includes(i)) cls.push("placeAnim");
+      if(S.lastCenterDealt && S.lastCenterDealt.includes(i)) cls.push("centerDeal");
+
+      const rk = S.ranked?.get(i);
+      if(rk===1) cls.push("top1");
+      if(rk===2) cls.push("top2");
+      if(rk===3) cls.push("top3");
+
+      cell.className = cls.join(" ");
+
+      // Ghost preview (pre-commit tactility)
+      let ghost = null;
+      if(!card && !S.gameOver && S.phase==="BATTLE"){
+        const handIdx = [...S.selectedHandIdx];
+        const cellIdx = [...S.selectedCells];
+        if(handIdx.length===2 && cellIdx.length>=1){
+          const gCards = [S.you.hand[handIdx[0]], S.you.hand[handIdx[1]]];
+          if(cellIdx[0]===i) ghost = gCards[0] || null;
+          if(cellIdx[1]===i) ghost = gCards[1] || null;
+          // Hover second placement shows second card as a ghost
+          if(!ghost && cellIdx.length===1 && S.hoverCell===i) ghost = gCards[1] || null;
+        }
+      }
+
+      if(card || ghost){
+        const c = card || ghost;
+        const suitCls = c.joker ? "" : suitToClass(c.suit);
+        const face = c.joker
+          ? `<span class="joker">Joker</span>`
+          : `<span class="rank">${c.rank}</span><span class="suitGlyph ${suitCls}">${c.suit}</span>`;
+        const corner = c.joker ? "★" : `<span class="${suitCls}">${c.suit}</span>`;
+        if(ghost && !card){ cell.classList.add("ghost"); }
+        cell.innerHTML = `
+          <div class="txt">${face}</div>
+          <div class="suit">${corner}</div>
+          ${ghost && !card ? `<div class="ghostNote">GHOST</div>` : ``}
+        `;
+      } else {
+        cell.innerHTML = `<div class="txt" style="opacity:.28">${isBorder(i) ? "+" : "•"}</div>`;
+      }
+
+      if(rk){
+        const b = document.createElement("div");
+        b.className = "rankBadge";
+        b.textContent = String(rk);
+        cell.appendChild(b);
+      }
+
+      cell.onclick = ()=>toggleCellPick(S, i);
+
+      // Hover: if this cell has a stored outcome, show it in preview
+      cell.onmouseenter = (ev)=>{
+        if(S.gameOver || S.phase!=="BATTLE") return;
+        S.hoverCell = i;
+        const out = S.cellOutcomes?.get(i);
+        S.hoverOutcome = out || null;
+        S.hoverLine = out?.best?.line || null;
+
+        if(S.hoverOutcome){
+          renderPreview(S);
+          const parts = [`Base ${out.base}`];
+          if(out.itemBonus) parts.push(` +${out.itemBonus} items`);
+          if(out.momentumBonus) parts.push(` +${out.momentumBonus} momentum`);
+          if(out.focusBonus) parts.push(` +${out.focusBonus} focus`);
+          tip.show(ev.clientX, ev.clientY, `<b>${out.name}</b> <span style="opacity:.75">(${lineLabelFromIndex(out.best?.lineIndex)})</span><br>${out.total} dmg<br><span style="opacity:.8">${parts.join("")}</span>`);
+        } else {
+          tip.hide();
+        }
+        applyLineHover(S);
+      };
+      cell.onmousemove = (ev)=>{
+        if(!S.hoverOutcome) return;
+        // keep same HTML, just move near cursor
+        const html = el.hoverTip.innerHTML;
+        tip.show(ev.clientX, ev.clientY, html);
+      };
+      cell.onmouseleave = ()=>{
+        S.hoverOutcome = null;
+        S.hoverLine = null;
+        S.hoverCell = null;
+        tip.hide();
+        renderPreview(S);
+        applyLineHover(S);
+      };
+
+      el.board.appendChild(cell);
+    }
+    applyLineHover(S);
+    // clear one-shot placement/deal markers after paint
+    if((S.lastEnemyPlaced && S.lastEnemyPlaced.length) || (S.lastPlayerPlaced && S.lastPlayerPlaced.length) || (S.lastCenterDealt && S.lastCenterDealt.length)){
+      setTimeout(()=>{
+        document.querySelectorAll(".cell.enemyNew").forEach(n=>n.classList.remove("enemyNew"));
+        document.querySelectorAll(".cell.enemyPlaceAnim").forEach(n=>n.classList.remove("enemyPlaceAnim"));
+        document.querySelectorAll(".cell.placeAnim").forEach(n=>n.classList.remove("placeAnim"));
+        document.querySelectorAll(".cell.centerDeal").forEach(n=>n.classList.remove("centerDeal"));
+      }, 720);
+      S.lastEnemyPlaced = [];
+      S.lastPlayerPlaced = [];
+      S.lastCenterDealt = [];
+    }
+  }
+
+
+  function applyLineHover(S){
+    const kids = el.board.children;
+    for(let i=0;i<kids.length;i++){
+      kids[i].classList.toggle("lineHover", !!(S.hoverLine && S.hoverLine.includes(i)));
+    }
+  }
+
+  function renderHands(S){
+    el.youHand.innerHTML = "";
+    S.you.hand.forEach((c,idx)=>{
+      const b = document.createElement("button");
+      b.className = "cardBtn" + (S.selectedHandIdx.has(idx) ? " sel" : "");
+      b.disabled = S.gameOver || S.phase!=="BATTLE";
+      b.title = c.joker ? "Joker: can represent any card" : `Card: ${c.rank}${c.suit}`;
+      const suitCls = c.joker ? "" : suitToClass(c.suit);
+      b.innerHTML = c.joker ? `<span class="joker">Joker</span>` : `<span class="rank">${c.rank}</span><span class="suitGlyph ${suitCls}">${c.suit}</span>`;
+      b.onclick = ()=>toggleHandPick(S, idx);
+      el.youHand.appendChild(b);
+    });
+
+    el.enHand.innerHTML = "";
+    const showAll = el.showEnemyToggle.checked;
+    for(let i=0;i<4;i++){
+      const c = S.en.hand[i];
+      const d = document.createElement("div");
+      const revealOne = (S.en.revealTurns>0 && S.en.revealIndex===i);
+      if(showAll || revealOne){
+        d.className = "cardBtn";
+        const suitCls = c.joker ? "" : suitToClass(c.suit);
+        d.innerHTML = c.joker ? `<span class="joker">Joker</span>` : `<span class="rank">${c.rank}</span><span class="suitGlyph ${suitCls}">${c.suit}</span>`;
+      } else {
+        d.className = "cardBtn facedown";
+        d.innerHTML = "🂠";
+      }
+      el.enHand.appendChild(d);
+    }
+
+    if(S.you.status.stun>0) el.youStatus.textContent = "You are stunned — you’ll skip your next action.";
+    else el.youStatus.textContent = `Pick 2 cards (${S.selectedHandIdx.size}/2) + 2 border cells (${S.selectedCells.size}/2).`;
+
+    const base = showAll ? "Visible (training)." : "Hidden by default.";
+    const peekNote = (S.en.revealTurns>0) ? ` Peek active (${S.en.revealTurns} turns).` : "";
+    el.enStatus.textContent = base + peekNote;
+
+    el.youEffect.textContent = statusString(S.you.status);
+    el.enEffect.textContent = statusString(S.en.status);
+  }
+
+  function renderBars(S){
+    el.runInfo.textContent = `F${S.floor} • Fight ${S.fightIndex+1}/2`;
+    el.enemyName.textContent = S.en.name;
+    el.turnCount.textContent = String(S.turn);
+    el.deckCount.textContent = String(S.deck.length);
+
+    const borderFilled = BORDER.map(i=>S.board[i]).filter(Boolean).length;
+    el.borderFill.textContent = `${borderFilled}/16`;
+
+    const you = Math.max(0,S.you.hp), en = Math.max(0,S.en.hp);
+    el.youHPText.textContent = `${you} / ${S.you.hpMax}`;
+    el.enHPText.textContent = `${en} / ${S.en.hpMax}`;
+    el.youHPFill.style.width = `${(you/S.you.hpMax)*100}%`;
+    el.enHPFill.style.width = `${(en/S.en.hpMax)*100}%`;
+
+    el.coinText.textContent = String(S.you.coins);
+    el.wildText.textContent = `${S.wild}/${S.wildMax}`;
+    el.redrawText.textContent = String(S.you.redrawLeft);
+    el.armorText.textContent = String(S.you.armor);
+    el.focusText.textContent = String(S.you.focus);
+    el.momText.textContent = String(S.you.momentum||0);
+
+    el.intentText.textContent = computeEnemyTelegraph(S);
+  }
+
+  function renderInventory(S){
+    el.invList.innerHTML = "";
+    if(S.you.items.length===0){
+      const row = document.createElement("div");
+      row.className="itemRow";
+      row.innerHTML = `<div><b>None</b><small>Win fights to earn rewards and buy items.</small></div>`;
+      el.invList.appendChild(row);
+      return;
+    }
+    for(const it of S.you.items){
+      const row = document.createElement("div");
+      row.className="itemRow";
+      row.innerHTML = `<div><b>${it.name}</b><small>${it.desc}</small></div><span class="tag">${it.rarity||"Item"}</span>`;
+      el.invList.appendChild(row);
+    }
+  }
+
+  function renderButtons(S){
+    const ready = (S.selectedHandIdx.size===2 && S.selectedCells.size===2);
+
+    el.btnCommit.disabled = S.gameOver || S.phase!=="BATTLE" || !ready || (S.you.status.stun>0);
+    el.btnRedraw.disabled = S.gameOver || S.phase!=="BATTLE" || (S.you.redrawLeft<=0);
+    el.btnJoker.disabled  = S.gameOver || S.phase!=="BATTLE" || (S.wild < S.wildMax);
+    el.btnShop.disabled   = S.gameOver;
+    el.btnPeek.disabled   = S.gameOver || S.phase!=="BATTLE" || !canPeek(S);
+
+    // Ready pulse
+    el.btnCommit.classList.remove("readyPulse");
+    if(!el.btnCommit.disabled) el.btnCommit.classList.add("readyPulse");
+  }
+
+  function renderAll(S){
+    renderBars(S);
+    renderPreview(S);
+    renderBoard(S);
+    renderHands(S);
+    renderInventory(S);
+    renderButtons(S);
+  }
+
+  function closeShopAndContinue(S){
+    closeShop(S);
+    if(S.gameOver) return;
+    // If we just won a fight, start the next one when leaving the shop.
+    if(S.nextEnemyTemplate){
+      startFight(S, S.nextEnemyTemplate);
+      S.nextEnemyTemplate = null;
+      renderAll(S);
+      return;
+    }
+    // Fallback (older behavior)
+    if(S.en && S.en.hp<=0){
+      startFight(S, pickEnemyFor(S));
+      renderAll(S);
+    }
+  }
+
+  function newRun(){
+    const S = {
+      deck: buildDeck(),
+      board: Array(25).fill(null),
+      phase:"BATTLE",
+      lastEnemyPlaced:[],
+      lastPlayerPlaced:[],
+      lastCenterDealt:[],
+      hoverCell:null,
+      floor:1, fightIndex:0,
+      turn:1,
+      selectedHandIdx:new Set(),
+      selectedCells:new Set(),
+      lastHighlightLine:null,
+      possibleCells:new Set(),
+      ranked:new Map(),
+      cellOutcomes:new Map(),
+      hoverOutcome:null,
+      preview:null,
+      wild:0, wildMax:6,
+      shopStock:null, shopStamp:"",
+      pendingReward:null,
+      nextEnemyTemplate:null,
+      gameOver:false,
+      you:{
+        hpMax:20, hp:20, coins:12,
+        hand:[],
+        items:[],
+        redrawMax:1, redrawLeft:1,
+        redrawBonusNext:0,
+        armor:0,
+        focus:0,
+        momentum:0,
+        peekUnlocked:false,
+        peekUsedThisFight:false,
+        status:{stun:0, poison:0},
+      },
+      en:null,
+      stats:{
+        fightTurns:0,
+        dealt:0,
+        taken:0,
+        whiffs:0,
+        bestHit:{dmg:0, name:"—"},
+        youHands:[],
+        enHands:[]
+      },
+      afterSummary:null
+    };
+
+    seedCenter(S, true);
+    startFight(S, pickEnemyFor(S));
+
+    el.log.textContent = "";
+    logLine(S, "New run.\n");
+    logLine(S, `You descend to Floor ${S.floor}.\n`);
+    toast("New run");
+
+    if(!window.__gridPokerHelpShown){
+      window.__gridPokerHelpShown = true;
+      el.helpOverlay.classList.add("on");
+    }
+
+    // Wire handlers with closure over S
+    el.btnCommit.onclick = ()=>commitTurn(S);
+    el.btnRedraw.onclick = ()=>redrawHand(S);
+    el.btnJoker.onclick  = ()=>useWildToJoker(S);
+    el.btnPeek.onclick   = ()=>doPeek(S);
+    el.btnShop.onclick   = ()=>{ sfx.open(); openShop(S, "Shop"); };
+    el.btnClear.onclick  = ()=>{ sfx.clear(); clearSelection(S); };
+    el.btnMute.onclick   = ()=>{
+      __audioEnabled = !__audioEnabled;
+      el.btnMute.innerHTML = (__audioEnabled ? "Sound: On" : "Sound: Off") + ` <span class="kbd">M</span>`;
+      toast(__audioEnabled ? "Sound on" : "Sound off");
+    };
+
+    if(el.btnStartNext) el.btnStartNext.onclick = ()=>{ closeShopAndContinue(S); };
+    el.btnCloseShop.onclick = ()=>closeShopAndContinue(S);
+    el.shopOverlay.onclick = (e)=>{ if(e.target===el.shopOverlay) closeShopAndContinue(S); };
+
+    el.showEnemyToggle.onchange = ()=>renderAll(S);
+
+    el.btnSumContinue.onclick = ()=>{ if(!el.summaryOverlay.classList.contains("on")) return; closeSummary(S); };
+    el.btnSumNew.onclick = ()=>{ el.summaryOverlay.classList.remove("on"); window.__S = newRun(); };
+    el.summaryOverlay.onclick = (e)=>{ if(e.target===el.summaryOverlay) closeSummary(S); };
+
+    // Keyboard shortcuts
+    window.onkeydown = (e)=>{
+      // try to unlock audio on first gesture
+      if(!__audioCtx) audioInit();
+      if(e.key === "Escape"){
+        if(el.shopOverlay.classList.contains("on")) closeShopAndContinue(S);
+        if(el.helpOverlay.classList.contains("on")) el.helpOverlay.classList.remove("on");
+      }
+      if(el.helpOverlay.classList.contains("on") || el.shopOverlay.classList.contains("on") || el.summaryOverlay.classList.contains("on")) return;
+      const k = e.key.toLowerCase();
+      if(k === "c"){ sfx.clear(); clearSelection(S); }
+      if(k === "r") redrawHand(S);
+      if(k === "j") useWildToJoker(S);
+      if(k === "p") doPeek(S);
+      if(k === "s") openShop(S, "Shop");
+      if(k === "h") el.helpOverlay.classList.add("on");
+      if(k === "m") el.btnMute.click();
+      if(e.key === "Enter") commitTurn(S);
+    };
+
+    renderAll(S);
+    return S;
+  }
+
+  // Overlay controls
+  el.btnNew.onclick = ()=>{ window.__S = newRun(); };
+  el.btnHelp.onclick = ()=>el.helpOverlay.classList.add("on");
+  el.btnCloseHelp.onclick = ()=>el.helpOverlay.classList.remove("on");
+  el.helpOverlay.onclick = (e)=>{ if(e.target===el.helpOverlay) el.helpOverlay.classList.remove("on"); };
+
+  // Start
+  window.__S = newRun();
+})();
+</script>
+</body>
+</html>
