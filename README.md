@@ -51,3 +51,5 @@ MIT — free to play, modify, and learn from.
 ## 💬 Notes
 This project explores poker mechanics as a spatial decision system rather than a gambling game.  
 Built as a compact, focused design experiment.
+
+https://magratheya.itch.io/grid-poker
